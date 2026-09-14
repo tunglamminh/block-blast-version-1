@@ -1,0 +1,661 @@
+
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Block Blast Style</title>
+
+<style>
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
+body {
+    height: 100vh;
+    background: #141c2e;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    color: white;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+}
+
+/* Khung giả lập màn hình điện thoại */
+.app-viewport {
+    width: min(100vw, 410px);
+    height: min(100vh, 860px);
+    background: radial-gradient(circle at 50% 20%, #2b3a67 0%, #172242 100%);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 16px 20px 25px 20px;
+    position: relative;
+    box-shadow: 0 0 60px rgba(0, 0, 0, 0.7);
+}
+
+/* TOP BAR */
+.top-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    height: 35px;
+}
+
+.highscore-box {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 22px;
+    font-weight: 800;
+    color: #ffd32a;
+    text-shadow: 0 0 10px rgba(255, 211, 42, 0.5);
+}
+
+.crown-icon {
+    font-size: 22px;
+}
+
+.settings-icon {
+    font-size: 22px;
+    color: #70a1ff;
+    cursor: pointer;
+}
+
+/* SCORE SECTION */
+.score-section {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-top: -5px;
+}
+
+.heart-badge {
+    position: relative;
+    width: 46px;
+    height: 46px;
+    background: radial-gradient(circle, #ff3838 0%, #ff4d4d 50%, #c56cf0 100%);
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    box-shadow: 0 0 20px #ff3838, 0 4px 12px rgba(0,0,0,0.4);
+}
+
+.heart-badge::after {
+    content: "♥";
+    font-size: 28px;
+    color: white;
+    margin-top: -2px;
+}
+
+.score-num {
+    font-size: 58px;
+    font-weight: 900;
+    color: #ffffff;
+    letter-spacing: 1px;
+    text-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+    margin-top: -2px;
+    line-height: 1;
+}
+
+/* BOARD CONSTRAINTS */
+.board-container {
+    width: 100%;
+    aspect-ratio: 1;
+    background: #0f172a;
+    border-radius: 14px;
+    padding: 6px;
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    gap: 3px;
+    box-shadow: inset 0 0 15px rgba(0, 0, 0, 0.8), 0 10px 25px rgba(0,0,0,0.4);
+    border: 2px solid #1e293b;
+}
+
+.cell {
+    background: #1e293b;
+    border-radius: 5px;
+    transition: background 0.08s, transform 0.08s;
+}
+
+/* KHỐI NỔI NỊNH MẮT (HIGH SATURATION & GLOSS) */
+.cell.filled, .block {
+    border-radius: 5px;
+    box-shadow: 
+        inset 2px 2px 3px rgba(255, 255, 255, 0.65),
+        inset -2px -2px 3px rgba(0, 0, 0, 0.4),
+        0 3px 6px rgba(0, 0, 0, 0.3);
+}
+
+.cell.filled {
+    transform: scale(0.96);
+}
+
+.cell.preview {
+    opacity: 0.5;
+    transform: scale(0.96);
+}
+
+/* PIECES CONTAINERS */
+.pieces-container {
+    width: 100%;
+    height: 125px;
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+}
+
+.piece {
+    width: 100px;
+    height: 100px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: grab;
+    touch-action: none;
+    z-index: 10;
+}
+
+.piece.dragging {
+    position: fixed !important;
+    pointer-events: none;
+    z-index: 1000 !important;
+    cursor: grabbing;
+    transform: translate(-50%, -100%) scale(1.1) !important; /* Căn giữa crosshair & đẩy khối lên trên tầm nhìn ngón tay */
+    filter: drop-shadow(0 10px 20px rgba(0,0,0,0.5));
+    transition: none !important;
+}
+
+.shape {
+    display: grid;
+    gap: 2px;
+}
+
+.block {
+    width: 22px;
+    height: 22px;
+}
+
+/* GAME OVER MODAL */
+.gameover {
+    position: fixed;
+    inset: 0;
+    background: rgba(10, 15, 30, 0.9);
+    backdrop-filter: blur(8px);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 999;
+}
+
+.gameover.show {
+    display: flex;
+}
+
+.modal {
+    width: min(85vw, 320px);
+    padding: 30px 20px;
+    text-align: center;
+    background: #1e293b;
+    border-radius: 20px;
+    border: 2px solid #334155;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.7);
+}
+
+.modal h2 {
+    font-size: 32px;
+    margin-bottom: 15px;
+    color: #ff4757;
+}
+
+.modal p {
+    font-size: 18px;
+    margin-bottom: 10px;
+    color: #cbd5e1;
+}
+
+.restart-btn {
+    background: linear-gradient(180deg, #10b981, #059669);
+    color: white;
+    border: none;
+    font-size: 18px;
+    font-weight: bold;
+    padding: 12px 30px;
+    border-radius: 25px;
+    cursor: pointer;
+    box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4);
+    margin-top: 15px;
+}
+
+.restart-btn:active {
+    transform: scale(0.95);
+}
+
+/* COMBO TEXT */
+.combo {
+    position: fixed;
+    left: 50%;
+    top: 42%;
+    transform: translate(-50%, -50%) scale(0.5);
+    font-size: 40px;
+    font-weight: 900;
+    color: #ffd32a;
+    opacity: 0;
+    pointer-events: none;
+    text-shadow: 0 0 25px rgba(255, 211, 42, 0.9), 0 4px 10px #000;
+    z-index: 100;
+}
+
+.combo.show {
+    animation: comboAnim 0.8s ease-out;
+}
+
+@keyframes comboAnim {
+    0% { opacity: 0; transform: translate(-50%, -50%) scale(0.5); }
+    30% { opacity: 1; transform: translate(-50%, -50%) scale(1.2); }
+    100% { opacity: 0; transform: translate(-50%, -80%) scale(1); }
+}
+</style>
+</head>
+
+<body>
+
+<div class="app-viewport">
+
+    <!-- TOP BAR -->
+    <div class="top-bar">
+        <div class="highscore-box">
+            <span class="crown-icon">👑</span>
+            <span id="highscore">0</span>
+        </div>
+        <div class="settings-icon">⚙</div>
+    </div>
+
+    <!-- SCORE -->
+    <div class="score-section">
+        <div class="heart-badge"></div>
+        <div id="score" class="score-num">0</div>
+    </div>
+
+    <!-- BOARD -->
+    <div id="board" class="board-container"></div>
+
+    <!-- PIECES BOTTOM -->
+    <div id="pieces" class="pieces-container"></div>
+
+</div>
+
+<div id="combo" class="combo">+100</div>
+
+<!-- GAME OVER -->
+<div id="gameover" class="gameover">
+    <div class="modal">
+        <h2>💀 KẾT THÚC</h2>
+        <p>Điểm: <b id="finalScore" style="color: #fff;">0</b></p>
+        <p>Kỷ lục: <b id="finalHigh" style="color: #ffd32a;">0</b></p>
+        <button class="restart-btn" onclick="restart()">Chơi lại</button>
+    </div>
+</div>
+
+<script>
+const SIZE = 8;
+
+const boardElement = document.getElementById("board");
+const piecesElement = document.getElementById("pieces");
+
+const scoreElement = document.getElementById("score");
+const highscoreElement = document.getElementById("highscore");
+
+const gameoverElement = document.getElementById("gameover");
+const finalScoreElement = document.getElementById("finalScore");
+const finalHighElement = document.getElementById("finalHigh");
+
+const comboElement = document.getElementById("combo");
+
+let board;
+let pieces;
+let score = 0;
+let highscore = Number(localStorage.getItem("blockblast_highscore")) || 2983;
+
+let activePiece = null;
+
+// BẢNG MÀU HIGH SATURATION NỊNH MẮT
+const colors = [
+    "#00d2d3", // Cyan tươi
+    "#00a8ff", // Blue đậm
+    "#ff9f1a", // Cam Neon
+    "#a29bfe", // Tím pastel đậm
+    "#ffd32a", // Vàng rực
+    "#05c46b", // Xanh ngọc lục bảo
+    "#ff4d4d"  // Đỏ tươi
+];
+
+const SHAPES = [
+    [[1]],
+    [[1,1]],
+    [[1],[1]],
+    [[1,1,1]],
+    [[1],[1],[1]],
+    [[1,1,1,1]],
+    [[1],[1],[1],[1]],
+    [[1,1],[1,1]],
+    [[1,1,1],[1,1,1]],
+    [[1,1],[1,1],[1,1]],
+    [[1,1,1],[0,1,0]],
+    [[0,1,0],[1,1,1]],
+    [[1,0],[1,1]],
+    [[0,1],[1,1]],
+    [[1,1,0],[0,1,1]],
+    [[0,1,1],[1,1,0]],
+    [[1,0,0],[1,1,1]],
+    [[0,0,1],[1,1,1]],
+    [[1,1,1],[1,0,0]],
+    [[1,1,1],[0,0,1]]
+];
+
+function restart() {
+    board = [];
+    for(let r = 0; r < SIZE; r++) {
+        board[r] = [];
+        for(let c = 0; c < SIZE; c++) {
+            board[r][c] = null;
+        }
+    }
+
+    score = 0;
+    gameoverElement.classList.remove("show");
+    updateScore();
+    createPieces();
+    renderBoard();
+}
+
+function createPieces() {
+    pieces = [];
+    for(let i = 0; i < 3; i++) {
+        const shape = SHAPES[Math.floor(Math.random() * SHAPES.length)];
+        pieces.push({
+            shape: shape,
+            color: colors[Math.floor(Math.random() * colors.length)],
+            used: false
+        });
+    }
+    renderPieces();
+}
+
+function renderBoard() {
+    boardElement.innerHTML = "";
+    for(let r = 0; r < SIZE; r++) {
+        for(let c = 0; c < SIZE; c++) {
+            const cell = document.createElement("div");
+            cell.className = "cell";
+            cell.dataset.row = r;
+            cell.dataset.col = c;
+
+            if(board[r][c]) {
+                cell.classList.add("filled");
+                cell.style.background = board[r][c];
+            }
+            boardElement.appendChild(cell);
+        }
+    }
+}
+
+function renderPieces() {
+    piecesElement.innerHTML = "";
+
+    pieces.forEach((piece, index) => {
+        const container = document.createElement("div");
+        container.className = "piece";
+        container.dataset.index = index;
+
+        if(piece.used) {
+            container.style.visibility = "hidden";
+        }
+
+        const shape = document.createElement("div");
+        shape.className = "shape";
+        shape.style.gridTemplateColumns = `repeat(${piece.shape[0].length}, 22px)`;
+
+        piece.shape.forEach(row => {
+            row.forEach(value => {
+                const block = document.createElement("div");
+                if(value) {
+                    block.className = "block";
+                    block.style.background = piece.color;
+                } else {
+                    block.style.width = "22px";
+                    block.style.height = "22px";
+                }
+                shape.appendChild(block);
+            });
+        });
+
+        container.appendChild(shape);
+        piecesElement.appendChild(container);
+    });
+}
+
+// XỬ LÝ KÉO THẢ TRACKING THEO CON TRỎ MƯỢT MÀ (GLOBAL EVENT LISTENERS)
+document.addEventListener("pointerdown", e => {
+    const pieceEl = e.target.closest(".piece");
+    if (!pieceEl) return;
+
+    const index = Number(pieceEl.dataset.index);
+    if (pieces[index].used) return;
+
+    activePiece = {
+        element: pieceEl,
+        index: index,
+        pointerId: e.pointerId
+    };
+
+    pieceEl.classList.add("dragging");
+    updateDraggingPosition(e.clientX, e.clientY);
+    e.preventDefault();
+});
+
+document.addEventListener("pointermove", e => {
+    if (!activePiece || e.pointerId !== activePiece.pointerId) return;
+
+    updateDraggingPosition(e.clientX, e.clientY);
+
+    // Tính vị trí ô trên bàn cờ dựa vào vị trí giả định khi thả (Đã bù Y-Offset)
+    const rect = boardElement.getBoundingClientRect();
+    const cellWidth = rect.width / SIZE;
+
+    // Y offset khoảng 50px nâng khối lên trên ngón tay
+    const targetX = e.clientX;
+    const targetY = e.clientY - 50;
+
+    const col = Math.floor((targetX - rect.left) / cellWidth);
+    const row = Math.floor((targetY - rect.top) / cellWidth);
+
+    clearPreview();
+
+    const shape = pieces[activePiece.index].shape;
+    if (canPlace(shape, row, col)) {
+        preview(pieces[activePiece.index], row, col);
+    }
+});
+
+document.addEventListener("pointerup", e => {
+    if (!activePiece || e.pointerId !== activePiece.pointerId) return;
+
+    const pieceEl = activePiece.element;
+    pieceEl.classList.remove("dragging");
+    pieceEl.style.left = "";
+    pieceEl.style.top = "";
+
+    const rect = boardElement.getBoundingClientRect();
+    const cellWidth = rect.width / SIZE;
+
+    const targetX = e.clientX;
+    const targetY = e.clientY - 50;
+
+    const col = Math.floor((targetX - rect.left) / cellWidth);
+    const row = Math.floor((targetY - rect.top) / cellWidth);
+
+    clearPreview();
+
+    const index = activePiece.index;
+    if (canPlace(pieces[index].shape, row, col)) {
+        placePiece(pieces[index], row, col);
+        pieces[index].used = true;
+        renderPieces();
+
+        if (pieces.every(p => p.used)) {
+            createPieces();
+        }
+
+        setTimeout(checkGameOver, 150);
+    }
+
+    activePiece = null;
+});
+
+function updateDraggingPosition(x, y) {
+    if (!activePiece) return;
+    activePiece.element.style.left = `${x}px`;
+    activePiece.element.style.top = `${y}px`;
+}
+
+function canPlace(shape, row, col) {
+    for(let r = 0; r < shape.length; r++) {
+        for(let c = 0; c < shape[r].length; c++) {
+            if(!shape[r][c]) continue;
+            const rr = row + r;
+            const cc = col + c;
+
+            if(rr < 0 || rr >= SIZE || cc < 0 || cc >= SIZE) return false;
+            if(board[rr][cc]) return false;
+        }
+    }
+    return true;
+}
+
+function placePiece(piece, row, col) {
+    let cells = 0;
+    for(let r = 0; r < piece.shape.length; r++) {
+        for(let c = 0; c < piece.shape[r].length; c++) {
+            if(piece.shape[r][c]) {
+                board[row+r][col+c] = piece.color;
+                cells++;
+            }
+        }
+    }
+
+    score += cells * 10;
+    renderBoard();
+    setTimeout(clearLines, 100);
+    updateScore();
+}
+
+function clearLines() {
+    let rows = [];
+    let cols = [];
+
+    for(let r = 0; r < SIZE; r++) {
+        if(board[r].every(cell => cell !== null)) rows.push(r);
+    }
+
+    for(let c = 0; c < SIZE; c++) {
+        let full = true;
+        for(let r = 0; r < SIZE; r++) {
+            if(!board[r][c]) { full = false; break; }
+        }
+        if(full) cols.push(c);
+    }
+
+    const total = rows.length + cols.length;
+    if(total === 0) return;
+
+    rows.forEach(r => {
+        for(let c = 0; c < SIZE; c++) board[r][c] = null;
+    });
+
+    cols.forEach(c => {
+        for(let r = 0; r < SIZE; r++) board[r][c] = null;
+    });
+
+    score += total * 100 + (total > 1 ? total * 50 : 0);
+    showCombo(total);
+    renderBoard();
+    updateScore();
+}
+
+function preview(piece, row, col) {
+    for(let r = 0; r < piece.shape.length; r++) {
+        for(let c = 0; c < piece.shape[r].length; c++) {
+            if(!piece.shape[r][c]) continue;
+            const rr = row + r;
+            const cc = col + c;
+
+            if(rr < 0 || rr >= SIZE || cc < 0 || cc >= SIZE) continue;
+
+            const index = rr * SIZE + cc;
+            const cell = boardElement.children[index];
+            cell.classList.add("preview");
+            cell.style.background = piece.color;
+        }
+    }
+}
+
+function clearPreview() {
+    document.querySelectorAll(".preview").forEach(cell => {
+        cell.classList.remove("preview");
+        const r = Number(cell.dataset.row);
+        const c = Number(cell.dataset.col);
+        cell.style.background = board[r][c] || "";
+    });
+}
+
+function checkGameOver() {
+    for(const piece of pieces) {
+        if(piece.used) continue;
+        for(let r = 0; r < SIZE; r++) {
+            for(let c = 0; c < SIZE; c++) {
+                if(canPlace(piece.shape, r, c)) return;
+            }
+        }
+    }
+    endGame();
+}
+
+function endGame() {
+    if(score > highscore) {
+        highscore = score;
+        localStorage.setItem("blockblast_highscore", highscore);
+    }
+
+    finalScoreElement.textContent = score;
+    finalHighElement.textContent = highscore;
+    gameoverElement.classList.add("show");
+    updateScore();
+}
+
+function updateScore() {
+    scoreElement.textContent = score;
+    highscoreElement.textContent = highscore;
+}
+
+function showCombo(lines) {
+    if(lines <= 1) return;
+    comboElement.textContent = lines === 2 ? "🔥 DOUBLE!" : lines === 3 ? "🔥 TRIPLE!" : "💥 AMAZING!";
+    comboElement.classList.remove("show");
+    void comboElement.offsetWidth;
+    comboElement.classList.add("show");
+}
+
+restart();
+</script>
+
+</body>
+</html>
+
+```
